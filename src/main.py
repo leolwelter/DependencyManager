@@ -5,6 +5,7 @@ from typing import List, Dict
 class Dependencies:
     deps: Dict[str, List[str]] = {}
     installed: List[str] = []
+    explicitly_installed: List[str] = [] # these are NOT removed implicitly
 
     def make_dependent(self, package: str, *args: str) -> None:
         """ make package dependent on *args """
@@ -28,6 +29,7 @@ class Dependencies:
             print('{} is already installed'.format(to_install))
             return
 
+        self.explicitly_installed.append(to_install)
         self._install_package_recur(to_install)
 
     def remove_package(self, to_remove: str) -> None:
@@ -42,7 +44,13 @@ class Dependencies:
             print('{} is not installed'.format(to_remove))
             return
 
-        self._remove_package_recur(to_remove)
+        # first we remove the head explicitly
+        print('Removing {}'.format(to_remove))
+        self.installed.remove(to_remove)
+
+        # then we remove the dependencies *implicitly*
+        for d in self.deps.get(to_remove, []):
+            self._remove_package_recur(d)
 
     def run_commands(self, command_list: List[List[str]]) -> None:
         # assume commands are formatted properly in input
@@ -71,10 +79,14 @@ class Dependencies:
             print('Installing {}'.format(package))
             self.installed.append(package)
 
+    '''only called by remove_package, after removing the explicit package'''
     def _remove_package_recur(self, to_remove: str) -> None:
         p_deps = self.deps.get(to_remove, [])
 
         # first we remove the head (if we can)
+        if to_remove in self.explicitly_installed:
+            return
+
         can_remove = True  # one way flag
         for i in self.installed:
             if to_remove in self.deps.get(i, []):
